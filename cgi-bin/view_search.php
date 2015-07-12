@@ -5,7 +5,7 @@
 </head>
 <body>
 <a href="/ctrl/page_prof_view.php">my profile</a>
-<a href="/ctrl/logout.php">logout</a>
+<a href="/ctrl/jmp_logout.php">logout</a>
 <form method="GET" action="/ctrl/page_search.php">
 <select name="type">
 	<option value="NaN">all</option>
@@ -29,7 +29,7 @@
 	<?php for ( $i=0 ; $i < count($devs) ; $i++) { ?>
 	<tr>
 		<td><?php echo $devs[$i]['type']; ?></td>
-		<td><a href=""><?php echo $devs[$i]['name']; ?></a></td>
+		<td><a href="/ctrl/page_bookdev.php?devid=<?php echo $devs[$i]['id']; ?>"><?php echo $devs[$i]['name']; ?></a></td>
 		<td><?php echo $devs[$i]['owner_name']; ?></td>
 		<td><?php echo $devs[$i]['amount']; ?></td>
 	</tr>
