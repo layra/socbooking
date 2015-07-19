@@ -41,6 +41,65 @@ function b_lib_sessionClose () {
 	session_destroy();
 }
 
+function b_lib_date_getFullYear ($date) {
+	$time = $date->getTimestamp();
+	$y = '' . getdate($time)['year'];
+	return $y;
+}
+
+function b_lib_date_getMonth ($date) {
+	$time = $date->getTimestamp();
+	$m = '' . getdate($time)['mon'];
+	while (strlen($m) < 2) {
+		$m = '0' . $m;
+	}
+	return $m;
+}
+
+function b_lib_date_getDate ($date) {
+	$time = $date->getTimestamp();
+	$d = getdate($time)['mday'];
+	while (strlen($d) < 2) {
+		$d = '0' . $d;
+	}
+	return $d;
+}
+
+function b_lib_date_getWeekday ($date) {
+	$time = $date->getTimestamp();
+	$wday = getdate($time)['wday'];
+	return $wday;
+}
+
+function b_lib_date_getGBString ($date) {
+	$y = b_lib_date_getFullYear($date);
+	$m = b_lib_date_getMonth($date);
+	$d = b_lib_date_getDate($date);
+	return $d . '/' . $m;/* . '/' . $y;*/
+}
+
+function b_lib_date_getUSAString ($date) {
+	$y = b_lib_date_getFullYear($date);
+	$m = b_lib_date_getMonth($date);
+	$d = b_lib_date_getDate($date);
+	return $y . '-' . $m . '-' . $d;
+}
+
+function b_lib_date_isWeekend ($date) {
+	$time = $date->getTimestamp();
+	$wday = getdate($time)['wday'];
+	return $wday == 0 || $wday == 6;
+}
+
+function b_lib_date_getTomorrow ($date) {
+	$daylen = 24 * 60 * 60;
+	$time = $date->getTimestamp();
+	$time += $daylen;
+	$tom = new DateTime();
+	$tom->setTimestamp($time);
+	return $tom;
+}
+
 
 //UserModel
 //	id
@@ -75,13 +134,13 @@ function b_user_load ($id, $password) {
 //	id
 //	name
 //	owner_name
+//	owner_office
 //	amount
 
-function b_dev_listAll () {
+function b_dev_listBySQL ($sql) {
 	b_db_getDB();
 	$devlist = array();
-	// array_push($devlist, )
-	$result = mysql_query("SELECT * FROM `socdevbooking`.`device_view`;");
+	$result = mysql_query($sql);
 	b_lib_assert($result, "SQL Error" . mysql_error());
 	while ($row = mysql_fetch_array($result)) {
 		$dev = array();
@@ -93,6 +152,94 @@ function b_dev_listAll () {
 		array_push($devlist, $dev);
 	}
 	return $devlist;
+}
+
+function b_dev_listAll () {
+	return b_dev_listBySQL("SELECT * FROM `socdevbooking`.`device_view`;");
+}
+
+function b_dev_listByType ($type) {
+	return b_dev_listBySQL("SELECT * FROM `socdevbooking`.`device_view` WHERE `device_type_id`='$type';");
+}
+
+function b_dev_listByKW ($keyword) {
+	return b_dev_listBySQL("SELECT * FROM `socdevbooking`.`device_view` WHERE `device_name` LIKE '%$keyword%';");
+}
+
+function b_dev_listByTypeAndKW ($type, $keyword) {
+	return b_dev_listBySQL("SELECT * FROM `socdevbooking`.`device_view` WHERE `device_type_id`='$type' AND `device_name` LIKE '%$keyword%';");
+}
+
+
+function b_dev_getDev ($id) {
+	b_db_getDB();
+	$result = mysql_query("SELECT * FROM `socdevbooking`.`device_view` WHERE `device_id`='$id';");
+	b_lib_assert($result, "SQL Error" . mysql_error());
+	$dev = array();
+	if ($row = mysql_fetch_array($result)) {
+		$dev['type'] = $row['device_type'];
+		$dev['id'] = $row['device_id'];
+		$dev['name'] = $row['device_name'];
+		$dev['owner_name'] = $row['holder_name'];
+		$dev['owner_office'] = $row['holder_office'];
+		$dev['amount'] = $row['amount'];
+	}
+	return $dev;
+}
+
+function b_dev_getCalender ($id) {
+	$dev = b_dev_getDev($id);
+
+	$amount = $dev['amount'];
+	$devlist = array();
+	$result = mysql_query(
+		"SELECT `booking_date` AS date, ($amount-sum(booking_amount)) AS avaliable"
+		. " FROM `socdevbooking`.`booking`"
+		. " WHERE `device_id`='$id' AND `booking_date`>=DATE(NOW())"
+		. " GROUP BY `device_id`, `booking_date`"
+		. " ORDER BY `booking_date`;"
+		);
+	b_lib_assert($result, "SQL Error" . mysql_error());
+	$booklist = array();
+	while ($row = mysql_fetch_array($result)) {
+		$booklist[$row['date']] = $row['avaliable'];
+	}
+
+	$days = array();
+
+	$weekday = array("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat");
+	$date = new DateTime();
+	$date->setTime(0, 0, 0);
+	while (b_lib_date_isWeekend($date)) {
+		$date = b_lib_date_getTomorrow($date);
+	}
+	while (count($days) < 20) {
+		if (!b_lib_date_isWeekend($date)) {
+			$dateindex = b_lib_date_getUSAString($date);
+			if (array_key_exists($dateindex, $booklist)) {
+				array_push($days, array(
+					'date' => $dateindex,
+					'wday' => b_lib_date_getWeekday($date),
+					'disp' => b_lib_date_getGBString($date),
+					'aval' => $booklist[$dateindex],
+					'height' => 100 - 100 * $booklist[$dateindex] /  $dev['amount']
+					)
+				);
+			}
+			else {
+				array_push($days, array(
+					'date' => $dateindex,
+					'wday' => b_lib_date_getWeekday($date),
+					'disp' => b_lib_date_getGBString($date),
+					'aval' => $dev['amount'],
+					'height' => 0
+					)
+				);
+			}
+		}
+		$date = b_lib_date_getTomorrow($date);
+	}
+	return $days;
 }
 
 ?>
