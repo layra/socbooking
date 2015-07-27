@@ -1,4 +1,8 @@
 <?php
+include_once("../cgi-bin/lib.php");
 
-include("../cgi-bin/view_search.php");
+$user = b_lib_sessionGetUser();
+
+include("../cgi-bin/view_prof_view.php");
+
 ?>

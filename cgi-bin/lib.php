@@ -100,6 +100,25 @@ function b_lib_date_getTomorrow ($date) {
 	return $tom;
 }
 
+function b_lib_date_getWeekDays ($start_date, $n) {
+	$days = array();
+
+	$date = $start_date;
+
+	while (b_lib_date_isWeekend($date)) {
+		$date = b_lib_date_getTomorrow($date);
+	}
+
+	while (count($days) < $n) {
+		if (!b_lib_date_isWeekend($date)) {
+			$dateindex = b_lib_date_getUSAString($date);
+			array_push($days, $dateindex);
+		}
+		$date = b_lib_date_getTomorrow($date);
+	}
+	return $days;
+}
+
 
 //UserModel
 //	id
@@ -128,6 +147,20 @@ function b_user_load ($id, $password) {
 	}
 }
 
+function b_user_edit ($id, $name, $email, $address) {
+	$sql = '';
+	if ($address) {
+		$sql = "UPDATE `user` SET `user_name` = '$name', `user_email` = '$email', `user_address` = '$address' WHERE `user_id` = '$id';";
+	}
+	else {
+		$sql = "UPDATE `user` SET `user_name` = '$name', `user_email` = '$email' WHERE `user_id` = '$id';";
+	}
+	b_db_getDB();
+	$result = mysql_query($sql);
+	b_lib_assert($result, "SQL Error" . mysql_error());
+	
+	return true;
+}
 
 //DeviceModel
 //	type
@@ -240,6 +273,50 @@ function b_dev_getCalender ($id) {
 		$date = b_lib_date_getTomorrow($date);
 	}
 	return $days;
+}
+
+function b_dev_mkBooking ($id, $uid, $s_date, $length, $amount) {
+	$y = substr($s_date, 0, 4);
+	$m = substr($s_date, 5, 2);
+	$d = substr($s_date, 8, 2);
+
+	$s_date = new DateTime();
+	$s_date->setDate($y, $m, $d);
+	$s_date->setTime(0, 0, 0);
+
+	$list = b_dev_getCalender($id);
+	$days = b_lib_date_getWeekDays($s_date, $length);
+
+	for ($si=0; $si < count($list) ; $si++) { 
+		if ($list[$si]['date'] == $days[0]) {
+			break;
+		}
+	}
+
+	if ($si + $length > count($list)) {
+		return false;
+	}
+
+	for ($i=$si; $i < $si + $length; $i++) { 
+		if ($list[$i]['aval'] < $amount) {
+			return false;
+		}
+	}
+
+	$sql = "";
+
+	for ($i=0; $i < $length; $i++) {
+		$sql = "INSERT INTO `socdevbooking`.`booking` (`borrower_id`, `device_id`, `booking_amount`, `booking_date`) VALUES ('$uid', '$id', '$amount', '".$days[$i]."');";
+		$result = mysql_query($sql);
+	}
+
+	
+	b_lib_assert($result, "SQL Error" . mysql_error());
+
+	echo $sql;
+	// print_r($list);
+	// print_r($days);
+	// echo "uid(".$uid.")";
 }
 
 ?>
